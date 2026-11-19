@@ -17,22 +17,25 @@ async function runWorker({ name, instruction, input, field, key, requestId }) {
   const response = await fetch(endpoint, {
     method: 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(60_000),
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ parts: [{ text: instruction + '\n' + JSON.stringify(input) }] }],
       generationConfig: {
-        maxOutputTokens: 512,
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingLevel: 'LOW' },
         responseMimeType: 'application/json',
         responseJsonSchema: textResult(field)
       }
     })
+  }).catch(error => {
+    throw new Error(`${name} could not reach Gemini: ${error.name}.`);
   });
 
   if (!response.ok) throw new Error(`${name} received HTTP ${response.status} from Gemini.`);
   const body = await response.json();
   const candidate = body.candidates?.[0];
-  if (candidate?.finishReason !== 'STOP') throw new Error(`${name} did not finish.`);
+  if (candidate?.finishReason !== 'STOP') throw new Error(`${name} did not finish (${candidate?.finishReason ?? 'no candidate'}).`);
   const content = candidate.content?.parts?.find(part => part.text && !part.thought)?.text;
   let result;
   try {
