@@ -1,0 +1,42 @@
+name: Public demo smoke test
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/public-smoke.yml]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check public UI, health and worker output
+        env:
+          DEMO_URL: https://personal-ai-engineering-platform-seven.vercel.app
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+
+          const base = process.env.DEMO_URL;
+          const get = path => fetch(base + path, { signal: AbortSignal.timeout(15_000) });
+          const ui = await get('/');
+          assert.equal(ui.status, 200);
+          assert.match(await ui.text(), /Run demo/);
+
+          const health = await get('/api/health');
+          assert.equal(health.status, 200);
+          assert.deepEqual(await health.json(), { status: 'ok', mode: 'rules-based' });
+
+          const demo = await fetch(base + '/api/demo', {
+            method: 'POST',
+            signal: AbortSignal.timeout(15_000)
+          });
+          assert.equal(demo.status, 200);
+          const result = await demo.json();
+          assert.match(result.requestId, /^[0-9a-f-]{36}$/);
+          assert.deepEqual(result.steps.map(({ worker }) => worker), ['triage', 'review']);
+          assert.equal(result.steps[1].result.severity, 'high');
+          console.log('Public demo passed. Request ID', result.requestId);
+          JS
