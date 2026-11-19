@@ -38,36 +38,39 @@ function runPipeline(requestId, log) {
   return { requestId, incidentId: incident.id, steps: [first, second] };
 }
 
-const page = readFileSync(new URL('./index.html', import.meta.url));
-const script = readFileSync(new URL('./demo.js', import.meta.url));
+function logEvent(entry) {
+  console.log(JSON.stringify(entry));
+}
 
-export function makeServer(log = entry => console.log(JSON.stringify(entry))) {
-  return createServer((request, response) => {
-    const send = (status, payload, type = 'application/json') => {
-      response.writeHead(status, {
-        'Content-Type': type,
-        'Cache-Control': 'no-store',
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'"
-      });
-      response.end(type === 'application/json' ? JSON.stringify(payload) : payload);
-    };
-    switch (`${request.method} ${request.url}`) {
-      case 'GET /':
-        return send(200, page, 'text/html; charset=utf-8');
-      case 'GET /demo.js':
-        return send(200, script, 'text/javascript; charset=utf-8');
-      case 'GET /api/health':
-        return send(200, { status: 'ok', mode: 'rules-based' });
-      case 'POST /api/demo':
-        if (request.headers['transfer-encoding'] || Number(request.headers['content-length'] ?? 0) > 0) {
-          return send(400, { error: 'This endpoint does not accept input.' });
-        }
-        return send(200, runPipeline(randomUUID(), log));
-      default:
-        return send(404, { error: 'Not found.' });
-    }
-  });
+export function handleRequest(request, response, url = request.url, log = logEvent) {
+  const send = (status, payload, type = 'application/json') => {
+    response.writeHead(status, {
+      'Content-Type': type,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+    });
+    response.end(type === 'application/json' ? JSON.stringify(payload) : payload);
+  };
+  switch (`${request.method} ${url}`) {
+    case 'GET /':
+      return send(200, readFileSync(new URL('./index.html', import.meta.url)), 'text/html; charset=utf-8');
+    case 'GET /demo.js':
+      return send(200, readFileSync(new URL('./demo.js', import.meta.url)), 'text/javascript; charset=utf-8');
+    case 'GET /api/health':
+      return send(200, { status: 'ok', mode: 'rules-based' });
+    case 'POST /api/demo':
+      if (request.headers['transfer-encoding'] || Number(request.headers['content-length'] ?? 0) > 0) {
+        return send(400, { error: 'This endpoint does not accept input.' });
+      }
+      return send(200, runPipeline(randomUUID(), log));
+    default:
+      return send(404, { error: 'Not found.' });
+  }
+}
+
+export function makeServer(log = logEvent) {
+  return createServer((request, response) => handleRequest(request, response, request.url, log));
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
