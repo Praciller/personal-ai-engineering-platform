@@ -1,7 +1,9 @@
 name: Public demo smoke test
 on:
-  repository_dispatch:
-    types: [vercel.deployment.success]
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       deployment_url:
@@ -17,23 +19,56 @@ permissions:
 
 jobs:
   smoke:
-    if: github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    concurrency:
+      group: public-smoke-${{ github.event_name == 'workflow_run' && 'production' || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Require the deployment commit
-        if: github.event_name == 'repository_dispatch'
+      - name: Wait for the verified commit on the public domain
+        if: github.event_name == 'workflow_run'
         env:
-          EXPECTED_COMMIT: ${{ github.event.client_payload.git.sha }}
-        run: test -n "$EXPECTED_COMMIT"
+          DEMO_URL: https://personal-ai-engineering-platform-seven.vercel.app
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { setTimeout as delay } from 'node:timers/promises';
+
+          const commit = process.env.EXPECTED_COMMIT;
+          assert.match(commit, /^[a-f0-9]{40}$/);
+          const url = new URL('/api/health', process.env.DEMO_URL);
+          for (let attempt = 1; attempt <= 18; attempt++) {
+            const response = await fetch(url, {
+              signal: AbortSignal.timeout(5_000),
+              redirect: 'error',
+              cache: 'no-store'
+            }).catch(() => undefined);
+            const deployedCommit = response?.headers.get('x-deployment-commit');
+            await response?.body?.cancel();
+            if (response?.ok && deployedCommit === commit) {
+              console.log('Public production is serving', commit);
+              process.exit(0);
+            }
+            console.log(`Attempt ${attempt}: production currently serves ${deployedCommit ?? 'an unknown commit'}`);
+            if (attempt < 18) await delay(5_000);
+          }
+          throw new Error(`Public production did not serve ${commit} within the release window.`);
+          JS
       - name: Check public UI, health and worker output
         env:
           DEMO_URL: ${{ inputs.deployment_url || 'https://personal-ai-engineering-platform-seven.vercel.app' }}
-          EXPECTED_COMMIT: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.git.sha || inputs.expected_commit }}
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha || inputs.expected_commit }}
         run: node scripts/smoke-demo.mjs
