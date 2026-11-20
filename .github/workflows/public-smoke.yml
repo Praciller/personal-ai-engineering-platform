@@ -1,7 +1,7 @@
 name: Public demo smoke test
 on:
   repository_dispatch:
-    types: [vercel.deployment.promoted]
+    types: [vercel.deployment.success]
   workflow_dispatch:
     inputs:
       deployment_url:
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Require the promoted commit
+      - name: Require the deployment commit
         if: github.event_name == 'repository_dispatch'
         env:
           EXPECTED_COMMIT: ${{ github.event.client_payload.git.sha }}
