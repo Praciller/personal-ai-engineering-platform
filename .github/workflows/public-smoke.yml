@@ -4,39 +4,31 @@ on:
     branches: [main]
     paths: [.github/workflows/public-smoke.yml]
   workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: Public HTTPS origin for the deployment under test
+        type: string
+        default: https://personal-ai-engineering-platform-seven.vercel.app
+      expected_commit:
+        description: Full Git SHA expected in the demo API responses
+        type: string
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
       - name: Check public UI, health and worker output
         env:
-          DEMO_URL: https://personal-ai-engineering-platform-seven.vercel.app
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-
-          const base = process.env.DEMO_URL;
-          const get = path => fetch(base + path, { signal: AbortSignal.timeout(15_000) });
-          const ui = await get('/');
-          assert.equal(ui.status, 200);
-          assert.match(await ui.text(), /Run demo/);
-
-          const health = await get('/api/health');
-          assert.equal(health.status, 200);
-          assert.deepEqual(await health.json(), { status: 'ok', mode: 'rules-based' });
-
-          const demo = await fetch(base + '/api/demo', {
-            method: 'POST',
-            signal: AbortSignal.timeout(15_000)
-          });
-          assert.equal(demo.status, 200);
-          const result = await demo.json();
-          assert.match(result.requestId, /^[0-9a-f-]{36}$/);
-          assert.deepEqual(result.steps.map(({ worker }) => worker), ['triage', 'review']);
-          assert.equal(result.steps[1].result.severity, 'high');
-          console.log('Public demo passed. Request ID', result.requestId);
-          JS
+          DEMO_URL: ${{ inputs.deployment_url || 'https://personal-ai-engineering-platform-seven.vercel.app' }}
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: node scripts/smoke-demo.mjs
