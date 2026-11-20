@@ -1,8 +1,7 @@
 name: Public demo smoke test
 on:
-  push:
-    branches: [main]
-    paths: [.github/workflows/public-smoke.yml]
+  repository_dispatch:
+    types: [vercel.deployment.promoted]
   workflow_dispatch:
     inputs:
       deployment_url:
@@ -18,6 +17,7 @@ permissions:
 
 jobs:
   smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -27,8 +27,13 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+      - name: Require the promoted commit
+        if: github.event_name == 'repository_dispatch'
+        env:
+          EXPECTED_COMMIT: ${{ github.event.client_payload.git.sha }}
+        run: test -n "$EXPECTED_COMMIT"
       - name: Check public UI, health and worker output
         env:
           DEMO_URL: ${{ inputs.deployment_url || 'https://personal-ai-engineering-platform-seven.vercel.app' }}
-          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          EXPECTED_COMMIT: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.git.sha || inputs.expected_commit }}
         run: node scripts/smoke-demo.mjs

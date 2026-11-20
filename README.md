@@ -8,4 +8,4 @@ An HTTP demo for data-quality incident triage. The Triage worker checks a fixed 
 
 Run `npm test` with Node.js 24 or newer to exercise the HTTP pipeline. Run `npm start` and open `http://localhost:8080` for the local UI.
 
-The demo has no credentials or runtime LLM calls. Vercel builds from `main` and assigns the public domain after the GitHub `verify` check passes. To verify a release, run **Public demo smoke test** with the full deployment commit SHA. The workflow checks that both API responses serve that commit. AI Studio's Cloud Run draft is separate from the public site and its publish flow requires billing for the selected project.
+The demo has no credentials or runtime LLM calls. Vercel builds from `main` and assigns the public domain after the GitHub `verify` check passes. After Vercel promotes a production deployment, **Public demo smoke test** checks the public domain and verifies that both API responses serve the promoted Git SHA. The workflow can also be run manually with a deployment origin and the expected full Git SHA. AI Studio's Cloud Run draft is separate from the public site and its publish flow requires billing for the selected project.
