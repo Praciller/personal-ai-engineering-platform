@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
-const model = 'gemini-4-hydrogen';
+const model = 'gemini-3.5-flash-lite';
 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 const incident = {
   failedChecks: [{ name: 'duplicate order IDs', count: 18 }, { name: 'stale records', count: 13 }],
@@ -14,16 +15,15 @@ const textResult = field => ({
 
 async function runWorker({ name, instruction, input, field, key, requestId }) {
   const start = performance.now();
-  const response = await fetch(endpoint, {
+  const request = () => fetch(endpoint, {
     method: 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(35_000),
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ parts: [{ text: instruction + '\n' + JSON.stringify(input) }] }],
       generationConfig: {
         maxOutputTokens: 1024,
-        thinkingConfig: { thinkingLevel: 'LOW' },
         responseMimeType: 'application/json',
         responseJsonSchema: textResult(field)
       }
@@ -31,6 +31,14 @@ async function runWorker({ name, instruction, input, field, key, requestId }) {
   }).catch(error => {
     throw new Error(`${name} could not reach Gemini: ${error.name}.`);
   });
+
+  let response = await request();
+  if (response.status === 503) {
+    await response.body?.cancel();
+    console.warn(JSON.stringify({ severity: 'WARNING', requestId, worker: name, model, status: 503, retry: 1 }));
+    await delay(1_000);
+    response = await request();
+  }
 
   if (!response.ok) throw new Error(`${name} received HTTP ${response.status} from Gemini.`);
   const body = await response.json();
