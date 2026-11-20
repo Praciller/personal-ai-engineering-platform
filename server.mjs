@@ -44,6 +44,8 @@ function logEvent(entry) {
 
 export function handleRequest(request, response, url = request.url, log = logEvent) {
   const send = (status, payload, type = 'application/json') => {
+    const commit = process.env.VERCEL_GIT_COMMIT_SHA;
+    if (/^[a-f0-9]{40}$/.test(commit ?? '')) response.setHeader('X-Deployment-Commit', commit);
     response.writeHead(status, {
       'Content-Type': type,
       'Cache-Control': 'no-store',
