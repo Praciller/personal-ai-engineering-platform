@@ -23,7 +23,7 @@ async function check(path, method = 'GET', verifyCommit = true) {
 }
 
 const ui = await check('/', 'GET', false);
-assert.match(await ui.text(), /Run demo/);
+assert.match(await ui.text(), /Run synthetic demo/);
 const client = await check('/demo.js', 'GET', false);
 await client.body?.cancel();
 const health = await check('/api/health');

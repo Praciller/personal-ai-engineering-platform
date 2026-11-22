@@ -1,21 +1,249 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Personal AI Engineering Platform</title>
-<style>
-  :root { color-scheme: dark; font: 16px/1.6 system-ui, sans-serif; background: #101827; color: #e7eef9; }
-  main { max-width: 48rem; margin: 10vh auto; padding: 0 1.25rem; }
-  h1 { line-height: 1.12; font-size: clamp(2rem, 6vw, 3.7rem); letter-spacing: -.045em; }
-  button { padding: .65rem 1rem; border: 0; border-radius: .5rem; font: inherit; font-weight: bold; background: #9acbff; color: #102039; cursor: pointer; }
-  pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; background: #19263b; border-radius: .5rem; }
-</style>
-<main>
-  <h1>Personal AI Engineering Platform</h1>
-  <p>Run two rules-based workers against a synthetic orders ingestion incident. Triage identifies failed checks, and review assigns severity and recommends a response.</p>
-  <button type="button">Run demo</button>
-  <p role="status">Ready to run</p>
-  <pre hidden></pre>
-</main>
-<script src="/demo.js" defer></script>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1421">
+  <title>Personal AI Engineering Platform</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1421;
+      color: #e8eff8;
+      --ink: #e8eff8;
+      --muted: #a4b5ca;
+      --line: #2c4059;
+      --surface: #142239;
+      --surface-soft: #101c2e;
+      --blue: #9ccaff;
+      --blue-deep: #142b48;
+      --amber: #f0bd6b;
+      --amber-deep: #3b2b19;
+      --green: #87d2b1;
+      --green-deep: #17372e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: #0b1421;
+    }
+
+    main {
+      width: min(100% - 2.5rem, 66rem);
+      margin-inline: auto;
+      padding: clamp(1.5rem, 5vh, 3.5rem) 0 4rem;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .brand { color: var(--ink); font-weight: 650; }
+    .demo-tag { white-space: nowrap; }
+
+    .introduction { max-width: 52rem; padding: clamp(2.25rem, 8vh, 4.5rem) 0 2rem; }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 19ch;
+      margin-bottom: 1rem;
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      line-height: 1.1;
+      letter-spacing: -.04em;
+    }
+
+    .introduction p { max-width: 62ch; margin-bottom: 0; color: var(--muted); }
+
+    .scenario {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      padding: 1.1rem 1.25rem;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--blue);
+      background: var(--surface-soft);
+    }
+
+    .scenario h2 { margin-bottom: .15rem; font-size: 1.05rem; }
+    .scenario p { margin-bottom: 0; color: var(--muted); font-size: .92rem; }
+
+    button {
+      flex: 0 0 auto;
+      min-height: 2.8rem;
+      padding: .65rem 1rem;
+      border: 1px solid transparent;
+      border-radius: .35rem;
+      background: var(--blue);
+      color: #0b1a2b;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) { background: #c0ddff; }
+    button:disabled { cursor: wait; opacity: .65; }
+
+    :focus-visible {
+      outline: 3px solid #f0bd6b;
+      outline-offset: 3px;
+    }
+
+    .run-status { min-height: 1.7rem; margin: .75rem 0 0; color: var(--muted); }
+
+    .results {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .results-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .results-header h2 { margin-bottom: .35rem; font-size: 1.45rem; }
+    .run-meta { margin: 0; color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
+
+    .severity-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2rem;
+      padding: .25rem .7rem;
+      border-radius: .25rem;
+      font-size: .85rem;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .severity-high, .severity-medium { background: var(--amber-deep); color: var(--amber); }
+    .severity-low { background: var(--green-deep); color: var(--green); }
+    .severity-unknown { background: var(--surface); color: var(--muted); }
+
+    .worker-trace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      list-style: none;
+    }
+
+    .worker-step { min-width: 0; padding: 1.4rem 1.5rem 1.5rem 0; }
+    .worker-step + .worker-step { padding-right: 0; padding-left: 1.5rem; border-left: 1px solid var(--line); }
+
+    .step-heading { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .75rem; align-items: start; }
+    .step-number { color: var(--blue); font-size: .85rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+    .step-heading h3 { margin-bottom: .15rem; font-size: 1.1rem; }
+    .step-description { margin-bottom: 0; color: var(--muted); font-size: .88rem; }
+
+    .check-summary { margin: 1rem 0 .4rem; font-size: .92rem; font-weight: 650; }
+
+    .check-list { margin: 0; padding: 0; list-style: none; }
+    .check-item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .7rem 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .check-name { min-width: 0; overflow-wrap: anywhere; }
+    .check-measure { color: var(--amber); font-size: .88rem; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+    .check-clear { margin: 1rem 0 0; color: var(--green); }
+
+    .review-label { margin: 1rem 0 .35rem; color: var(--muted); font-size: .85rem; }
+    .review-recommendation { margin-bottom: 0; padding-left: .9rem; border-left: 2px solid var(--amber); font-size: 1rem; }
+
+    .payload-details { margin-top: 1.1rem; color: var(--muted); }
+    .payload-details summary { width: fit-content; cursor: pointer; }
+    .payload-details summary:hover { color: var(--ink); }
+    pre {
+      overflow: auto;
+      max-height: 24rem;
+      margin: .75rem 0 0;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: #d8e4f3;
+      font: .82rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .demo-note { margin: 2rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+
+    @media (max-width: 680px) {
+      main { width: min(100% - 2rem, 66rem); padding-top: 1.2rem; }
+      .introduction { padding: 2.3rem 0 1.5rem; }
+      .scenario { align-items: stretch; flex-direction: column; gap: 1rem; }
+      button { width: 100%; }
+      .worker-trace { grid-template-columns: 1fr; }
+      .worker-step { padding: 1.25rem 0; }
+      .worker-step + .worker-step { padding: 1.25rem 0; border-top: 1px solid var(--line); border-left: 0; }
+      .results-header { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <span class="brand">Personal AI Engineering Platform</span>
+      <span class="demo-tag">Public demo · no sign-in</span>
+    </header>
+
+    <section class="introduction" aria-labelledby="page-title">
+      <h1 id="page-title">Follow one incident from check to response.</h1>
+      <p>Two rules-based workers inspect a fixed synthetic orders incident. Review the failed checks, then inspect the suggested action.</p>
+    </section>
+
+    <section class="scenario" aria-labelledby="scenario-title">
+      <div>
+        <h2 id="scenario-title">Fixed synthetic scenario</h2>
+        <p>Orders ingestion · duplicate IDs and stale records</p>
+      </div>
+      <button id="run-demo" type="button">Run synthetic demo</button>
+    </section>
+
+    <p id="run-status" class="run-status" role="status" aria-live="polite">Ready. No data is saved and no LLM is called.</p>
+
+    <section id="results" class="results" aria-labelledby="results-title" aria-busy="false" hidden>
+      <header class="results-header">
+        <div>
+          <h2 id="results-title">Incident review</h2>
+          <p id="incident-meta" class="run-meta"></p>
+        </div>
+        <span id="severity-badge" class="severity-badge severity-unknown" hidden></span>
+      </header>
+
+      <ol id="worker-steps" class="worker-trace" aria-label="Worker execution trace"></ol>
+
+      <details class="payload-details">
+        <summary>Inspect full run payload</summary>
+        <pre id="run-payload"></pre>
+      </details>
+    </section>
+
+    <p class="demo-note">This demo uses deterministic rules and synthetic data. It does not call an LLM, save a run, or make operational decisions.</p>
+  </main>
+  <script src="/demo.js" defer></script>
+</body>
 </html>
