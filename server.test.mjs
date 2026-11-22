@@ -13,8 +13,15 @@ test('HTTP demo handles public traffic, runs workers in order, and correlates lo
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
 
-  assert.match(await (await fetch(base)).text(), /Run demo/);
-  assert.equal((await fetch(base + '/demo.js')).status, 200);
+  const html = await (await fetch(base)).text();
+  assert.match(html, /Run synthetic demo/);
+  assert.match(html, /role="status" aria-live="polite"/);
+  assert.match(html, /id="worker-steps"/);
+  assert.match(html, /Inspect full run payload/);
+  assert.match(html, /no sign-in/);
+  const script = await fetch(base + '/demo.js');
+  assert.equal(script.status, 200);
+  assert.match(await script.text(), /validatePayload/);
   assert.deepEqual(await (await fetch(base + '/api/health')).json(), { status: 'ok', mode: 'rules-based' });
   const response = await fetch(base + '/api/demo', { method: 'POST' });
   assert.equal(response.status, 200);
